@@ -52,6 +52,40 @@ function getRideCost(r){
   return energy*rate;
 }
 
+function requestNotificationPermission(){
+  if(!('Notification' in window)){alert('Browser does not support notifications.');return}
+  Notification.requestPermission().then(p=>{
+    if(p==='granted') {
+      alert('Smart Push Notifications Enabled! 🔔');
+      triggerNotifications();
+    } else alert('Permission not granted.');
+  });
+}
+window.requestNotificationPermission = requestNotificationPermission;
+
+function triggerNotifications(){
+  let odo=currentOdo(), now=new Date().toISOString().slice(0,10);
+  let dueServices=v().services.filter(s=>(s.atOdo&&odo>=s.atOdo)||(s.dueDate&&s.dueDate<=now));
+  let last=latestRide();
+  let lowBattery = last && Number(last.bTo) <= 20;
+
+  let messages=[];
+  if(lowBattery) messages.push(`⚠️ Battery low (${last.bTo}%). Time to charge your vehicle!`);
+  dueServices.forEach(s=>messages.push(`🔧 Service due: ${s.name} (${s.atOdo?'At '+s.atOdo+' km':''} ${s.dueDate?'by '+s.dueDate:''})`));
+
+  let listEl = $('smartNotificationsList');
+  if(messages.length) {
+    listEl.innerHTML = messages.map(m=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${esc(m)}</div>`).join('');
+    if('Notification' in window && Notification.permission === 'granted'){
+      messages.forEach(msg=>{
+        try { new Notification('RideLog Alert ⚡', { body: msg, icon: 'icon.svg' }); } catch(e){}
+      });
+    }
+  } else {
+    listEl.innerHTML = 'All clear! Battery level and service schedules are up to date. 👍';
+  }
+}
+
 function renderHome(){
   let rides=sorted(),last=latestRide(),odo=currentOdo(),dist=0,units=0,cost=0;
   rides.forEach((r,i)=>{
@@ -81,6 +115,8 @@ function renderHome(){
 
   let due=v().services.filter(s=>s.atOdo&&odo>=s.atOdo||s.dueDate&&s.dueDate<=new Date().toISOString().slice(0,10));
   $('nextService').textContent=due.length?due.map(s=>s.name+' · due').join(' | '):(v().services[0]?.name+' · '+(v().services[0]?.atOdo?Math.max(0,Math.round(v().services[0].atOdo-odo))+' km left':'date reminder'))||'No reminders set.';
+
+  triggerNotifications();
 }
 
 function previewCalc(){
@@ -174,6 +210,8 @@ $('rideForm').onsubmit=e=>{
     electricRate:val('electricRate'),
     tag:$('rideTag').value,
     chargeSource:$('chargeSource').value,
+    startLoc:$('rideStartLoc').value.trim(),
+    endLoc:$('rideEndLoc').value.trim(),
     notes:$('rideNotes').value
   };
   if(r.bFrom>100||r.bTo>100||r.bFrom<0||r.bTo<0||r.energy<0){alert('Check battery percentage and energy values.');return}
@@ -198,6 +236,8 @@ function resetRide(){
   $('electricRate').value=v().electricRate;
   $('rideTag').value='City';
   $('chargeSource').value='Home Grid';
+  $('rideStartLoc').value='';
+  $('rideEndLoc').value='';
   configureOdoSlider(currentOdo(),false);
   previewCalc();
 }
@@ -217,16 +257,19 @@ function editRates(){
 window.editRates=editRates;
 
 function renderRides(){
-  let q=$('rideSearch').value.toLowerCase(),chron=sorted(),rs=[...v().rides].sort((a,b)=>b.date.localeCompare(a.date)||b.odo-a.odo).filter(r=>(r.date+' '+r.notes+' '+(r.tag||'')+' '+(r.chargeSource||'')).toLowerCase().includes(q));
+  let q=$('rideSearch').value.toLowerCase(),chron=sorted(),rs=[...v().rides].sort((a,b)=>b.date.localeCompare(a.date)||b.odo-a.odo).filter(r=>(r.date+' '+r.notes+' '+(r.tag||'')+' '+(r.chargeSource||'')+' '+(r.startLoc||'')+' '+(r.endLoc||'')).toLowerCase().includes(q));
   $('rideHistory').innerHTML=rs.length?rs.map(r=>{
     let ix=chron.findIndex(x=>x.id===r.id),d=ix>=0?Math.max(0,kmRide(r,ix)):0;
     let cost=getRideCost(r);
+    let routeInfo=(r.startLoc||r.endLoc)? ` 📍 ${esc(r.startLoc||'Start')} → ${esc(r.endLoc||'End')}` : '';
     return `<div class="entry">
       <div class="history-head">
         <div>
-          <b>${r.date} · ${Math.round(d)} km</b>
-          <span class="pill tag">${r.tag||'City'}</span>
-          <span class="pill tag">${r.chargeSource||'Home Grid'}</span>
+          <b>${r.date} · ${Math.round(d)} km</b>${routeInfo}
+          <div style="margin-top:2px">
+            <span class="pill tag">${r.tag||'City'}</span>
+            <span class="pill tag">${r.chargeSource||'Home Grid'}</span>
+          </div>
         </div>
         <button class="history-toggle" aria-label="Show details" onclick="toggleRideDetails('${r.id}',this)">⌄</button>
       </div>
@@ -262,6 +305,8 @@ window.editRide=id=>{
   $('electricRate').value=r.electricRate;
   $('rideTag').value=r.tag||'City';
   $('chargeSource').value=r.chargeSource||'Home Grid';
+  $('rideStartLoc').value=r.startLoc||'';
+  $('rideEndLoc').value=r.endLoc||'';
   $('rideNotes').value=r.notes||'';
   $('rideFormTitle').textContent='Edit Ride Record';
   $('rideSave').textContent='Save Changes';
@@ -296,7 +341,7 @@ $('serviceEveryKmSlider').addEventListener('input',()=>{$('serviceEveryKm').valu
 
 $('serviceForm').onsubmit=e=>{
   e.preventDefault();
-  let s={id:uid(),name:$('serviceName').value,atOdo:val('serviceAtOdo'),everyKm:val('serviceEveryKm'),dueDate:$('serviceDueDate').value,everyDays:val('serviceEveryDays'),cost:val('serviceCost')};
+  let s={id:uid(),type:$('serviceType').value,name:$('serviceName').value,atOdo:val('serviceAtOdo'),everyKm:val('serviceEveryKm'),dueDate:$('serviceDueDate').value,everyDays:val('serviceEveryDays'),cost:val('serviceCost')};
   if(!s.atOdo&&!s.dueDate&&!s.everyKm&&!s.everyDays&&!s.cost){alert('Set at least an odometer, date, or cost.');return}
   v().services.push(s);
   persist();
@@ -316,13 +361,24 @@ function renderServices(){
   $('totalServiceCost').textContent=fmt(totalMaintCost);
   $('totalTcoKm').textContent=dist?fmt(tcoKm):'—';
 
+  let catTotals={};
+  v().services.forEach(s=>{
+    let t=s.type||'Servicing';
+    catTotals[t]=(catTotals[t]||0)+(Number(s.cost)||0);
+  });
+  let catHtml=Object.keys(catTotals).map(k=>`<b>${k}:</b> ${fmt(catTotals[k])}`).join(' · ');
+  $('expenseCategoryBreakdown').innerHTML=catHtml? `Category breakdown: ${catHtml}` : 'No categorized expenses yet.';
+
   $('serviceHistory').innerHTML=v().services.length?v().services.map(s=>{
     let dueKm=s.atOdo&&odo>=s.atOdo,dueDate=s.dueDate&&s.dueDate<=now;
     let isDue=dueKm||dueDate;
     return `<div class="entry">
       <div class="toolbar">
-        <b>${esc(s.name)}</b>
-        <span class="pill ${isDue?'due':''}">${isDue?'DUE':'Upcoming'}</span>
+        <div>
+          <b>${esc(s.name)}</b>
+          <span class="pill tag" style="margin-left:4px">${s.type||'Servicing'}</span>
+        </div>
+        <span class="pill ${isDue?'due':''}">${isDue?'DUE':'Recorded'}</span>
       </div>
       <div class="muted" style="margin-top:4px">
         ${s.atOdo?'At '+s.atOdo.toLocaleString()+' km':''}
@@ -336,12 +392,12 @@ function renderServices(){
         <button class="btn" onclick="deleteService('${s.id}')">Delete</button>
       </div>
     </div>`
-  }).join(''):'No reminders set.';
+  }).join(''):'No expenses recorded.';
 }
 
 window.editService=id=>{
   let s=v().services.find(x=>x.id===id);if(!s)return;
-  let name=prompt('Reminder name',s.name);if(name===null)return;
+  let name=prompt('Expense / Component name',s.name);if(name===null)return;
   let at=prompt('Remind at odometer (km)',s.atOdo||'');if(at===null)return;
   let interval=prompt('Repeat interval (km)',s.everyKm||'');if(interval===null)return;
   let cost=prompt('Spent cost (₹)',s.cost||'0');if(cost===null)return;
@@ -362,7 +418,7 @@ window.markService=id=>{
 };
 
 window.deleteService=id=>{
-  if(confirm('Delete reminder?')){
+  if(confirm('Delete expense entry?')){
     v().services=v().services.filter(s=>s.id!==id);
     persist();renderAll();
   }
@@ -413,6 +469,62 @@ function aggregateFor(vehicles,filter){
 
 function fmtEfficiency(n){return n>0?n.toFixed(2)+' km/kWh':'—'}
 
+function renderLongTermSavings(){
+  let pPrice = val('calcPetrolPrice') || 105;
+  let pMil = val('calcPetrolMileage') || 40;
+  let dist = val('calcProjectedKm') || 10000;
+  let tariff = val('calcPowerTariff') || 8.5;
+
+  let petrolCost = (dist / pMil) * pPrice;
+
+  // Vehicle 1: Ola S1 X (~40 km/kWh real efficiency, 4 kWh pack)
+  let olaEff = 35; 
+  let olaUnits = dist / olaEff;
+  let olaCost = olaUnits * tariff;
+
+  // Vehicle 2: Tata Punch EV (~8 km/kWh real efficiency, 40 kWh pack)
+  let punchEff = 7.5; 
+  let punchUnits = dist / punchEff;
+  let punchCost = punchUnits * tariff;
+
+  $('longTermSavingsResults').innerHTML = `
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Vehicle / Mode</th>
+            <th>Projected Distance</th>
+            <th>Power / Fuel Cost</th>
+            <th>Savings vs Petrol</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Petrol Vehicle</b> (${pMil} km/L @ ₹${pPrice})</td>
+            <td>${dist.toLocaleString()} km</td>
+            <td>${fmt(petrolCost)}</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><b>Ola S1 X Scooter</b> (~${olaEff} km/kWh)</td>
+            <td>${dist.toLocaleString()} km</td>
+            <td>${fmt(olaCost)}</td>
+            <td><b style="color:var(--accent)">${fmt(petrolCost - olaCost)} saved</b></td>
+          </tr>
+          <tr>
+            <td><b>Tata Punch EV</b> (~${punchEff} km/kWh)</td>
+            <td>${dist.toLocaleString()} km</td>
+            <td>${fmt(punchCost)}</td>
+            <td><b style="color:var(--accent)">${fmt(petrolCost - punchCost)} saved</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+['calcPetrolPrice','calcPetrolMileage','calcProjectedKm','calcPowerTariff'].forEach(id=>$(id).addEventListener('input',renderLongTermSavings));
+
 function renderStats(){
   let m=$('statsMonth').value||new Date().toISOString().slice(0,7),year=$('statsYear').value||m.slice(0,4),vehicles=statsVehicles();
   let month=aggregateFor(vehicles,x=>x.month===m),yr=aggregateFor(vehicles,x=>x.year===year);
@@ -430,6 +542,25 @@ function renderStats(){
   $('statYearEfficiency').textContent=fmtEfficiency(yr.eff);
   $('statYearPetrol').textContent=fmt(yr.petrol);
   $('statYearSavings').textContent=fmt(yr.saved);
+
+  // Battery health & range tracking
+  let rides=sorted();
+  let validRides=rides.filter(r=>(Number(r.bFrom)-Number(r.bTo))>=30 && Number(r.odo)>0);
+  if(validRides.length>=2){
+    let avgEff = yr.eff > 0 ? yr.eff : (month.eff > 0 ? month.eff : 35);
+    let packCap = Number(v().batteryCapacity) || 4;
+    let estimatedRealRange = avgEff * packCap;
+    let expectedMax = Number(v().maxRange) || 180;
+    let healthPct = Math.min(100, Math.round((estimatedRealRange / expectedMax) * 100));
+    $('batteryHealthStatus').textContent = `${healthPct}% Nominal Health`;
+    $('batteryRealizedRange').textContent = `${Math.round(estimatedRealRange)} km / charge`;
+  } else {
+    $('batteryHealthStatus').textContent = 'Healthy (Log more rides)';
+    $('batteryRealizedRange').textContent = `${v().maxRange||180} km (theoretical)`;
+  }
+
+  // Long-term savings rendering
+  renderLongTermSavings();
 
   let tags=['City','Highway','Mixed','Eco'];
   let tagHtml=tags.map(t=>{
@@ -530,10 +661,10 @@ $('exportData').onclick=()=>{
 };
 
 $('exportCsv').onclick=()=>{
-  let rows=[['Vehicle','Date','Odometer (km)','Battery From (%)','Battery To (%)','Energy (kWh)','Trip Tag','Charge Source','Notes']];
+  let rows=[['Vehicle','Date','Odometer (km)','Battery From (%)','Battery To (%)','Energy (kWh)','Trip Tag','Charge Source','Start Location','End Location','Notes']];
   db.vehicles.forEach(veh=>{
     (veh.rides||[]).forEach(r=>{
-      rows.push([veh.name, r.date, r.odo, r.bFrom, r.bTo, r.energy, r.tag||'City', r.chargeSource||'Home Grid', `"${(r.notes||'').replace(/"/g,'""')}"`]);
+      rows.push([veh.name, r.date, r.odo, r.bFrom, r.bTo, r.energy, r.tag||'City', r.chargeSource||'Home Grid', r.startLoc||'', r.endLoc||'', `"${(r.notes||'').replace(/"/g,'""')}"`]);
     });
   });
   let csvContent = rows.map(e => e.join(',')).join('\n');
