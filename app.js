@@ -45,13 +45,20 @@ $('vehicleSwitch').onclick=()=>{
 
 function latestRide(){return [...v().rides].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||(Number(b.odo)||0)-(Number(a.odo)||0))[0]}
 
+function getRideCost(r){
+  let energy=Number(r.energy)||0;
+  if(r.chargeSource==='Home Solar'||r.chargeSource==='Office / Free') return 0;
+  let rate=Number(r.electricRate)||Number(v().electricRate)||0;
+  return energy*rate;
+}
+
 function renderHome(){
   let rides=sorted(),last=latestRide(),odo=currentOdo(),dist=0,units=0,cost=0;
   rides.forEach((r,i)=>{
-    let d=kmRide(r,i),energy=Number(r.energy)||0,rate=Number(r.electricRate)||Number(v().electricRate)||0;
+    let d=kmRide(r,i),energy=Number(r.energy)||0;
     dist+=Math.max(0,Number(d)||0);
     units+=energy;
-    cost+=energy*rate;
+    cost+=getRideCost(r);
   });
   let avg=units?dist/units:0;
   let lastIndex=last?rides.findIndex(r=>r.id===last.id):-1;
@@ -69,7 +76,7 @@ function renderHome(){
   $('homeEfficiency').textContent=avg?avg.toFixed(2)+' km/kWh':'— km/kWh';
   $('homeCostKm').textContent=dist?fmt(cost/dist):'—';
   $('homeUnits').textContent=last?(Number(last.energy)||0).toFixed(2)+' kWh':'— kWh';
-  $('homeCost').textContent=last?fmt((Number(last.energy)||0)*(Number(last.electricRate)||Number(v().electricRate)||0)):'—';
+  $('homeCost').textContent=last?fmt(getRideCost(last)):'—';
   $('rideCount').textContent=rides.length+' entries';
 
   let due=v().services.filter(s=>s.atOdo&&odo>=s.atOdo||s.dueDate&&s.dueDate<=new Date().toISOString().slice(0,10));
@@ -78,16 +85,18 @@ function renderHome(){
 
 function previewCalc(){
   let prev=currentOdo(),now=val('currentOdo'),distance=now-prev,energy=estimatedEnergy(val('batteryFrom'),val('batteryTo')),rate=val('electricRate');
+  let src=$('chargeSource').value;
+  let cRate=(src==='Home Solar'||src==='Office / Free')?0:rate;
   $('energy').value=energy.toFixed(2);
   $('batteryFromValue').textContent=val('batteryFrom')+'%';
   $('batteryToValue').textContent=val('batteryTo')+'%';
   $('currentOdoValue').textContent=now.toLocaleString(undefined,{maximumFractionDigits:1})+' km';
   $('calcDistance').textContent=distance>=0?distance.toFixed(1)+' km':'Check odometer';
   $('calcEfficiency').textContent=energy>0&&distance>=0?(distance/energy).toFixed(2)+' km/kWh':'—';
-  $('calcCost').textContent=fmt(energy*rate);
-  $('calcCostKm').textContent=distance>0?fmt(energy*rate/distance):'—';
+  $('calcCost').textContent=fmt(energy*cRate);
+  $('calcCostKm').textContent=distance>0?fmt(energy*cRate/distance):'—';
 }
-['currentOdo','batteryFrom','batteryTo','electricRate'].forEach(id=>$(id).addEventListener('input',previewCalc));
+['currentOdo','batteryFrom','batteryTo','electricRate','chargeSource'].forEach(id=>$(id).addEventListener('input',previewCalc));
 
 window.setFromVal=n=>{$('batteryFrom').value=n;previewCalc()};
 window.setToVal=n=>{$('batteryTo').value=n;previewCalc()};
@@ -138,7 +147,19 @@ $('rideForm').onsubmit=e=>{
   e.preventDefault();
   let oldId=$('rideId').value,odo=val('currentOdo'),previous=currentOdo();
   if(odo<previous&&!oldId){alert('Current odometer cannot be lower than the last saved odometer.');return}
-  let r={id:oldId||uid(),date:$('chargeDate').value,bFrom:val('batteryFrom'),bTo:val('batteryTo'),odo,energy:estimatedEnergy(val('batteryFrom'),val('batteryTo')),petrolRate:val('petrolRate'),electricRate:val('electricRate'),notes:$('rideNotes').value};
+  let r={
+    id:oldId||uid(),
+    date:$('chargeDate').value,
+    bFrom:val('batteryFrom'),
+    bTo:val('batteryTo'),
+    odo,
+    energy:estimatedEnergy(val('batteryFrom'),val('batteryTo')),
+    petrolRate:val('petrolRate'),
+    electricRate:val('electricRate'),
+    tag:$('rideTag').value,
+    chargeSource:$('chargeSource').value,
+    notes:$('rideNotes').value
+  };
   if(r.bFrom>100||r.bTo>100||r.bFrom<0||r.bTo<0||r.energy<0){alert('Check battery percentage and energy values.');return}
   let ix=v().rides.findIndex(x=>x.id===r.id);
   if(ix>=0)v().rides[ix]=r;else v().rides.push(r);
@@ -159,6 +180,8 @@ function resetRide(){
   setChargeDate(new Date().toISOString().slice(0,10));
   $('petrolRate').value=v().petrolRate;
   $('electricRate').value=v().electricRate;
+  $('rideTag').value='City';
+  $('chargeSource').value='Home Grid';
   configureOdoSlider(currentOdo(),false);
   previewCalc();
 }
@@ -178,16 +201,21 @@ function editRates(){
 window.editRates=editRates;
 
 function renderRides(){
-  let q=$('rideSearch').value.toLowerCase(),chron=sorted(),rs=[...v().rides].sort((a,b)=>b.date.localeCompare(a.date)||b.odo-a.odo).filter(r=>(r.date+' '+r.notes).toLowerCase().includes(q));
+  let q=$('rideSearch').value.toLowerCase(),chron=sorted(),rs=[...v().rides].sort((a,b)=>b.date.localeCompare(a.date)||b.odo-a.odo).filter(r=>(r.date+' '+r.notes+' '+(r.tag||'')+' '+(r.chargeSource||'')).toLowerCase().includes(q));
   $('rideHistory').innerHTML=rs.length?rs.map(r=>{
     let ix=chron.findIndex(x=>x.id===r.id),d=ix>=0?Math.max(0,kmRide(r,ix)):0;
+    let cost=getRideCost(r);
     return `<div class="entry">
       <div class="history-head">
-        <div><b>${r.date} · ${d.toFixed(1)} km</b></div>
+        <div>
+          <b>${r.date} · ${d.toFixed(1)} km</b>
+          <span class="pill tag">${r.tag||'City'}</span>
+          <span class="pill tag">${r.chargeSource||'Home Grid'}</span>
+        </div>
         <button class="history-toggle" aria-label="Show details" onclick="toggleRideDetails('${r.id}',this)">⌄</button>
       </div>
       <div class="history-detail hidden" id="rideDetail_${r.id}">
-        <div class="muted">Battery ${r.bFrom}% → ${r.bTo}% · Odo ${r.odo.toLocaleString()} km · ${Number(r.energy).toFixed(2)} kWh · ${(r.energy?d/r.energy:0).toFixed(2)} km/kWh · ${fmt(r.energy*r.electricRate)}</div>
+        <div class="muted">Battery ${r.bFrom}% → ${r.bTo}% · Odo ${r.odo.toLocaleString()} km · ${Number(r.energy).toFixed(2)} kWh · ${(r.energy?d/r.energy:0).toFixed(2)} km/kWh · ${fmt(cost)}</div>
         <div class="muted">${esc(r.notes||'')}</div>
         <div class="actions">
           <button class="icon-action" title="Edit" aria-label="Edit" onclick="editRide('${r.id}')">✎</button>
@@ -216,6 +244,8 @@ window.editRide=id=>{
   $('energy').value=r.energy;
   $('petrolRate').value=r.petrolRate;
   $('electricRate').value=r.electricRate;
+  $('rideTag').value=r.tag||'City';
+  $('chargeSource').value=r.chargeSource||'Home Grid';
   $('rideNotes').value=r.notes||'';
   $('rideFormTitle').textContent='Edit Ride Record';
   $('rideSave').textContent='Save Changes';
@@ -250,8 +280,8 @@ $('serviceEveryKmSlider').addEventListener('input',()=>{$('serviceEveryKm').valu
 
 $('serviceForm').onsubmit=e=>{
   e.preventDefault();
-  let s={id:uid(),name:$('serviceName').value,atOdo:val('serviceAtOdo'),everyKm:val('serviceEveryKm'),dueDate:$('serviceDueDate').value,everyDays:val('serviceEveryDays')};
-  if(!s.atOdo&&!s.dueDate&&!s.everyKm&&!s.everyDays){alert('Set at least an odometer or date reminder.');return}
+  let s={id:uid(),name:$('serviceName').value,atOdo:val('serviceAtOdo'),everyKm:val('serviceEveryKm'),dueDate:$('serviceDueDate').value,everyDays:val('serviceEveryDays'),cost:val('serviceCost')};
+  if(!s.atOdo&&!s.dueDate&&!s.everyKm&&!s.everyDays&&!s.cost){alert('Set at least an odometer, date, or cost.');return}
   v().services.push(s);
   persist();
   $('serviceForm').reset();
@@ -262,6 +292,14 @@ $('serviceForm').onsubmit=e=>{
 
 function renderServices(){
   let odo=currentOdo(),now=new Date().toISOString().slice(0,10);
+  let totalMaintCost=v().services.reduce((acc,s)=>acc+(Number(s.cost)||0),0);
+  let rides=sorted(),dist=0,powerCost=0;
+  rides.forEach((r,i)=>{dist+=Math.max(0,kmRide(r,i));powerCost+=getRideCost(r)});
+  let tcoKm=dist? (powerCost+totalMaintCost)/dist : 0;
+  
+  $('totalServiceCost').textContent=fmt(totalMaintCost);
+  $('totalTcoKm').textContent=dist?fmt(tcoKm):'—';
+
   $('serviceHistory').innerHTML=v().services.length?v().services.map(s=>{
     let dueKm=s.atOdo&&odo>=s.atOdo,dueDate=s.dueDate&&s.dueDate<=now;
     let isDue=dueKm||dueDate;
@@ -274,6 +312,7 @@ function renderServices(){
         ${s.atOdo?'At '+s.atOdo.toLocaleString()+' km':''}
         ${s.everyKm?' · Repeat every '+s.everyKm+' km':''}
         ${s.dueDate?' · Date '+s.dueDate:''}
+        ${s.cost?' · Cost '+fmt(s.cost):''}
       </div>
       <div class="actions">
         <button class="btn" onclick="editService('${s.id}')">✎ Edit</button>
@@ -289,8 +328,9 @@ window.editService=id=>{
   let name=prompt('Reminder name',s.name);if(name===null)return;
   let at=prompt('Remind at odometer (km)',s.atOdo||'');if(at===null)return;
   let interval=prompt('Repeat interval (km)',s.everyKm||'');if(interval===null)return;
+  let cost=prompt('Spent cost (₹)',s.cost||'0');if(cost===null)return;
   let date=prompt('Next due date (YYYY-MM-DD)',s.dueDate||'');if(date===null)return;
-  s.name=name;s.atOdo=Number(at)||0;s.everyKm=Number(interval)||0;s.dueDate=date;
+  s.name=name;s.atOdo=Number(at)||0;s.everyKm=Number(interval)||0;s.cost=Number(cost)||0;s.dueDate=date;
   persist();renderAll();
 };
 
@@ -328,8 +368,9 @@ function vehicleRideRows(vehicle){
     let odo=Number(r.odo)||0,dist=Math.max(0,odo-previous);
     previous=Math.max(previous,odo);
     let energy=Math.max(0,Number(r.energy)||0),electricRate=Math.max(0,Number(r.electricRate??vehicle.electricRate)||0),petrolMileage=Number(vehicle.petrolMileage)||0,petrolRate=Math.max(0,Number(r.petrolRate??vehicle.petrolRate)||0);
+    let cost= (r.chargeSource==='Home Solar'||r.chargeSource==='Office / Free') ? 0 : energy*electricRate;
     let petrol=petrolMileage>0?dist/petrolMileage*petrolRate:0;
-    return {vehicle,r,date:String(r.date||''),month:monthKey(r.date),year:String(r.date||'').slice(0,4),dist,energy,electricRate,cost:energy*electricRate,petrol,saved:petrolMileage>0?petrol-energy*electricRate:null,eff:energy>0?dist/energy:0};
+    return {vehicle,r,date:String(r.date||''),month:monthKey(r.date),year:String(r.date||'').slice(0,4),dist,energy,electricRate,cost,petrol,saved:petrolMileage>0?petrol-cost:null,eff:energy>0?dist/energy:0,tag:r.tag||'City'};
   });
 }
 
@@ -373,6 +414,14 @@ function renderStats(){
   $('statYearEfficiency').textContent=fmtEfficiency(yr.eff);
   $('statYearPetrol').textContent=fmt(yr.petrol);
   $('statYearSavings').textContent=fmt(yr.saved);
+
+  // Category breakdown
+  let tags=['City','Highway','Mixed','Eco'];
+  let tagHtml=tags.map(t=>{
+    let tagRows=aggregateFor(vehicles,x=>x.year===year && x.tag===t);
+    return `<div class="metric"><small>${t} Category</small><strong>${tagRows.dist.toFixed(1)} km · ${fmtEfficiency(tagRows.eff)}</strong></div>`;
+  }).join('');
+  $('categoryBreakdown').innerHTML=`<div class="grid">${tagHtml}</div>`;
 
   let monthAgg=Array.from({length:12},(_,i)=>{
     let key=year+'-'+String(i+1).padStart(2,'0');
@@ -461,6 +510,22 @@ $('exportData').onclick=()=>{
   let a=document.createElement('a'),blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   a.href=URL.createObjectURL(blob);
   a.download='ridelog-backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+$('exportCsv').onclick=()=>{
+  let rows=[['Vehicle','Date','Odometer (km)','Battery From (%)','Battery To (%)','Energy (kWh)','Trip Tag','Charge Source','Notes']];
+  db.vehicles.forEach(veh=>{
+    (veh.rides||[]).forEach(r=>{
+      rows.push([veh.name, r.date, r.odo, r.bFrom, r.bTo, r.energy, r.tag||'City', r.chargeSource||'Home Grid', `"${(r.notes||'').replace(/"/g,'""')}"`]);
+    });
+  });
+  let csvContent = rows.map(e => e.join(',')).join('\n');
+  let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ridelog-data.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 };
