@@ -63,7 +63,7 @@ function renderHome(){
   let avg=units?dist/units:0;
   let lastIndex=last?rides.findIndex(r=>r.id===last.id):-1;
   let lastDist=last&&lastIndex>=0?Math.max(0,kmRide(last,lastIndex)):0;
-  let battery=last?Math.max(0,Math.min(100,Number(last.bTo)||0)):0;
+  let battery=last?Math.max(0,Math.min(100,Math.round(Number(last.bTo)||0))):0;
   let used=last?Math.max(0,Math.min(100-battery,(Number(last.bFrom)||0)-(Number(last.bTo)||0))):0;
   let total=battery+used;
   
@@ -71,7 +71,7 @@ function renderHome(){
   $('batteryRing').style.setProperty('--charged',battery+'%');
   $('batteryRing').style.setProperty('--total',total+'%');
   $('lastChargeDate').textContent=last?'L.C. · '+last.date:'L.C. —';
-  $('homeOdo').textContent=odo?odo.toLocaleString()+' km':'— km';
+  $('homeOdo').textContent=odo?Math.round(odo).toLocaleString()+' km':'— km';
   $('homeDistance').textContent=last?lastDist.toFixed(1)+' km':'— km';
   $('homeEfficiency').textContent=avg?avg.toFixed(2)+' km/kWh':'— km/kWh';
   $('homeCostKm').textContent=dist?fmt(cost/dist):'—';
@@ -80,34 +80,49 @@ function renderHome(){
   $('rideCount').textContent=rides.length+' entries';
 
   let due=v().services.filter(s=>s.atOdo&&odo>=s.atOdo||s.dueDate&&s.dueDate<=new Date().toISOString().slice(0,10));
-  $('nextService').textContent=due.length?due.map(s=>s.name+' · due').join(' | '):(v().services[0]?.name+' · '+(v().services[0]?.atOdo?Math.max(0,v().services[0].atOdo-odo)+' km left':'date reminder'))||'No reminders set.';
+  $('nextService').textContent=due.length?due.map(s=>s.name+' · due').join(' | '):(v().services[0]?.name+' · '+(v().services[0]?.atOdo?Math.max(0,Math.round(v().services[0].atOdo-odo))+' km left':'date reminder'))||'No reminders set.';
 }
 
 function previewCalc(){
-  let prev=currentOdo(),now=val('currentOdo'),distance=now-prev,energy=estimatedEnergy(val('batteryFrom'),val('batteryTo')),rate=val('electricRate');
+  let prev=Math.round(currentOdo()),now=Math.round(val('currentOdo')),distance=now-prev,energy=estimatedEnergy(val('batteryFrom'),val('batteryTo')),rate=val('electricRate');
   let src=$('chargeSource').value;
   let cRate=(src==='Home Solar'||src==='Office / Free')?0:rate;
+  let bFrom=Math.round(val('batteryFrom')),bTo=Math.round(val('batteryTo'));
   $('energy').value=energy.toFixed(2);
-  $('batteryFromValue').textContent=val('batteryFrom')+'%';
-  $('batteryToValue').textContent=val('batteryTo')+'%';
-  $('currentOdoValue').textContent=now.toLocaleString(undefined,{maximumFractionDigits:1})+' km';
-  $('calcDistance').textContent=distance>=0?distance.toFixed(1)+' km':'Check odometer';
+  $('batteryFromValue').textContent=String(bFrom);
+  $('batteryToValue').textContent=String(bTo);
+  $('currentOdoValue').textContent=now.toLocaleString();
+  $('calcDistance').textContent=distance>=0?distance+' km':'Check odometer';
   $('calcEfficiency').textContent=energy>0&&distance>=0?(distance/energy).toFixed(2)+' km/kWh':'—';
   $('calcCost').textContent=fmt(energy*cRate);
   $('calcCostKm').textContent=distance>0?fmt(energy*cRate/distance):'—';
 }
 ['currentOdo','batteryFrom','batteryTo','electricRate','chargeSource'].forEach(id=>$(id).addEventListener('input',previewCalc));
 
-window.setFromVal=n=>{$('batteryFrom').value=n;previewCalc()};
-window.setToVal=n=>{$('batteryTo').value=n;previewCalc()};
+window.stepVal=(id,delta,min,max)=>{
+  let el=$(id);
+  let next=Math.min(max,Math.max(min,Math.round(Number(el.value)||0)+delta));
+  el.value=next;
+  previewCalc();
+};
+
+window.stepOdo=delta=>{
+  let el=$('currentOdo');
+  let min=Math.round(Number(el.min)||0);
+  let max=Math.round(Number(el.max)||min);
+  let next=Math.min(max,Math.max(min,Math.round(Number(el.value)||0)+delta));
+  el.value=next;
+  previewCalc();
+};
 
 function configureOdoSlider(value=currentOdo(),editing=false){
-  let slider=$('currentOdo'),base=currentOdo(),range=Number(v().maxRange)||(/punch/i.test(v().name)?450:180);
-  slider.min=editing?Math.max(0,Number(value)-range):base;
-  slider.max=Math.max(Number(value)+range,base+range,range);
-  slider.step='0.1';
-  slider.value=Number(value)||0;
-  $('odoRangeHint').textContent=`Slide from ${Number(slider.min).toLocaleString()} to ${Number(slider.max).toLocaleString()} km`;
+  let slider=$('currentOdo'),base=Math.round(currentOdo()),range=Math.round(Number(v().maxRange)||(/punch/i.test(v().name)?450:180));
+  let valNum=Math.round(Number(value)||0);
+  slider.min=editing?Math.max(0,valNum-range):base;
+  slider.max=Math.max(valNum+range,base+range,range);
+  slider.step='1';
+  slider.value=valNum;
+  $('odoRangeHint').textContent=`Slide from ${Number(slider.min).toLocaleString()} to ${Number(slider.max).toLocaleString()}`;
   previewCalc();
 }
 
@@ -145,15 +160,16 @@ function initChargeDate(){
 
 $('rideForm').onsubmit=e=>{
   e.preventDefault();
-  let oldId=$('rideId').value,odo=val('currentOdo'),previous=currentOdo();
+  let oldId=$('rideId').value,odo=Math.round(val('currentOdo')),previous=Math.round(currentOdo());
   if(odo<previous&&!oldId){alert('Current odometer cannot be lower than the last saved odometer.');return}
+  let bFrom=Math.round(val('batteryFrom')),bTo=Math.round(val('batteryTo'));
   let r={
     id:oldId||uid(),
     date:$('chargeDate').value,
-    bFrom:val('batteryFrom'),
-    bTo:val('batteryTo'),
+    bFrom,
+    bTo,
     odo,
-    energy:estimatedEnergy(val('batteryFrom'),val('batteryTo')),
+    energy:estimatedEnergy(bFrom,bTo),
     petrolRate:val('petrolRate'),
     electricRate:val('electricRate'),
     tag:$('rideTag').value,
@@ -208,14 +224,14 @@ function renderRides(){
     return `<div class="entry">
       <div class="history-head">
         <div>
-          <b>${r.date} · ${d.toFixed(1)} km</b>
+          <b>${r.date} · ${Math.round(d)} km</b>
           <span class="pill tag">${r.tag||'City'}</span>
           <span class="pill tag">${r.chargeSource||'Home Grid'}</span>
         </div>
         <button class="history-toggle" aria-label="Show details" onclick="toggleRideDetails('${r.id}',this)">⌄</button>
       </div>
       <div class="history-detail hidden" id="rideDetail_${r.id}">
-        <div class="muted">Battery ${r.bFrom}% → ${r.bTo}% · Odo ${r.odo.toLocaleString()} km · ${Number(r.energy).toFixed(2)} kWh · ${(r.energy?d/r.energy:0).toFixed(2)} km/kWh · ${fmt(cost)}</div>
+        <div class="muted">Battery ${Math.round(r.bFrom)}% → ${Math.round(r.bTo)}% · Odo ${Math.round(r.odo).toLocaleString()} km · ${Number(r.energy).toFixed(2)} kWh · ${(r.energy?d/r.energy:0).toFixed(2)} km/kWh · ${fmt(cost)}</div>
         <div class="muted">${esc(r.notes||'')}</div>
         <div class="actions">
           <button class="icon-action" title="Edit" aria-label="Edit" onclick="editRide('${r.id}')">✎</button>
@@ -238,8 +254,8 @@ window.editRide=id=>{
   let r=v().rides.find(x=>x.id===id);if(!r)return;
   $('rideId').value=r.id;
   setChargeDate(r.date);
-  $('batteryFrom').value=r.bFrom;
-  $('batteryTo').value=r.bTo;
+  $('batteryFrom').value=Math.round(Number(r.bFrom)||0);
+  $('batteryTo').value=Math.round(Number(r.bTo)||0);
   configureOdoSlider(r.odo,true);
   $('energy').value=r.energy;
   $('petrolRate').value=r.petrolRate;
@@ -415,7 +431,6 @@ function renderStats(){
   $('statYearPetrol').textContent=fmt(yr.petrol);
   $('statYearSavings').textContent=fmt(yr.saved);
 
-  // Category breakdown
   let tags=['City','Highway','Mixed','Eco'];
   let tagHtml=tags.map(t=>{
     let tagRows=aggregateFor(vehicles,x=>x.year===year && x.tag===t);

@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#121614",
   "theme_color": "#121614",
-  "description": "RideLog V7.0: EV ride, charging, service, maintenance & advanced analytics",
+  "description": "RideLog V7.1: EV ride, charging, service, maintenance & advanced analytics",
   "icons": [
     {
       "src": "icon.svg",
