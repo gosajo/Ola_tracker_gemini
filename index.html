@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121614">
+<link rel="manifest" href="manifest.json">
+<title>RideLog — EV Companion</title>
+<style>
+:root {
+  --bg: #f4f6f4;
+  --panel: #ffffff;
+  --panel-glass: rgba(255, 255, 255, 0.85);
+  --soft: #eaf0ea;
+  --ink: #171d18;
+  --muted: #626e64;
+  --line: #dce3dd;
+  --accent: #2e7d52;
+  --accent-light: #48a870;
+  --accent2: #e1efe5;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --shadow: 0 4px 20px -2px rgba(24, 37, 27, 0.06);
+  --radius: 18px;
+}
+[data-theme=dark] {
+  --bg: #0d110e;
+  --panel: #151a16;
+  --panel-glass: rgba(21, 26, 22, 0.85);
+  --soft: #1e2620;
+  --ink: #f0f4f1;
+  --muted: #8c998e;
+  --line: #27332a;
+  --accent: #4ade80;
+  --accent-light: #22c55e;
+  --accent2: #193322;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --shadow: none;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+header {
+  max-width: 1100px;
+  margin: auto;
+  padding: 16px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.brand { font-weight: 800; letter-spacing: -0.3px; font-size: 21px; display: flex; align-items: center; gap: 8px; }
+.brand span { color: var(--accent); }
+.sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+main { max-width: 1100px; margin: auto; padding: 4px 14px 100px; }
+.vehicle-chip {
+  background: var(--accent2);
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  padding: 8px 14px;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+  transition: transform 0.15s ease;
+}
+.vehicle-chip:active { transform: scale(0.96); }
+.card {
+  background: var(--panel-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin: 12px 0;
+  box-shadow: var(--shadow);
+}
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.metric small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; display: block; }
+.metric strong { font-size: 20px; display: block; margin-top: 4px; font-weight: 800; letter-spacing: -0.5px; }
+h2 { font-size: 18px; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.2px; }
+h3 { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+.muted { color: var(--muted); font-size: 13px; }
+.big { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 14px 0 6px; }
+input:not([type=range]), select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+input:not([type=range]):focus, select:focus { border-color: var(--accent); }
+input[type=range] {
+  width: 100%;
+  height: 36px;
+  margin: 4px 0;
+  appearance: none;
+  background: transparent;
+  accent-color: var(--accent);
+  touch-action: pan-y;
+}
+input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 20px; background: var(--line); }
+input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  margin-top: -9px;
+  cursor: pointer;
+}
+.quick-btns { display: flex; gap: 6px; margin-top: 8px; }
+.quick-btn {
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--ink);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.slider-value { font-size: 20px; font-weight: 800; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.slider-block { background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 6px; }
+.battery-single { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.battery-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ring.dual {
+  background: conic-gradient(var(--accent) 0 var(--charged), var(--warning) var(--charged) var(--total), var(--soft) var(--total) 100%);
+  transition: background 0.3s ease;
+}
+.date-select { display: grid; grid-template-columns: 1fr 1.35fr 1.1fr; gap: 8px; background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
+.date-select select { padding: 9px 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 13px; }
+.history-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.history-toggle {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 0;
+  display: grid;
+  place-items: center;
+}.history-toggle:before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.18s;
+}
+.history-toggle[aria-expanded="true"]:before { transform: translateY(2px) rotate(225deg); }
+.history-detail { padding: 12px 0 0 2px; }
+.icon-action { border: 0; border-radius: 10px; background: var(--soft); color: var(--ink); width: 36px; height: 34px; font-size: 16px; cursor: pointer; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.date-pick { display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px; }
+.date-pick input { border: 0 !important; background: transparent !important; padding: 6px 0 !important; font-size: 13px !important; }
+.service-readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.service-readings label { font-size: 9px; letter-spacing: 0.3px; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+.service-readings input { padding: 8px 4px !important; text-align: center; font-size: 13px !important; border-radius: 10px !important; }
+.service-slider { background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 8px 0; }
+.service-slider .toolbar { font-size: 12px; }
+button { cursor: pointer; border: 0; font-family: inherit; }
+.btn { border: 1px solid var(--line); background: var(--soft); color: var(--ink); padding: 10px 14px; border-radius: 12px; font-weight: 650; font-size: 13px; }
+.primary { background: var(--accent); color: #ffffff; padding: 13px 18px; border-radius: 12px; font-weight: 750; font-size: 14px; transition: opacity 0.15s ease; }
+[data-theme=dark] .primary { color: #0d110e; }
+.primary:active { opacity: 0.85; }
+.iconbtn { border: 1px solid var(--line); background: var(--soft); color: var(--ink); border-radius: 10px; padding: 6px 10px; font-size: 15px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.entry { border-top: 1px solid var(--line); padding: 14px 0; }
+.entry:first-child { border-top: 0; }
+.hidden { display: none !important; }
+.pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; background: var(--accent2); color: var(--accent); }
+.pill.due { background: rgba(220, 38, 38, 0.15); color: var(--danger); }
+.ringwrap { display: flex; align-items: center; gap: 16px; }
+.ring { width: 110px; height: 110px; flex: 0 0 110px; border-radius: 50%; display: grid; place-items: center; position: relative; }
+.ring:before { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: var(--panel); }
+.ring span { position: relative; font-size: 24px; font-weight: 800; }
+.layout { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--panel-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+.bottom button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 12px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  transition: color 0.15s ease;
+}
+.bottom button.active { color: var(--accent); font-weight: 800; }
+.bottom b { font-size: 19px; line-height: 1; }
+.bar { height: 10px; background: var(--soft); border-radius: 20px; overflow: hidden; border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 20px; transition: width 0.3s ease; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+@media (min-width: 720px) {
+  main { padding: 12px 24px 40px; }
+  .grid { grid-template-columns: repeat(4, 1fr); }
+  .layout { grid-template-columns: 1.1fr 0.9fr; }
+  .bottom {
+    position: static;
+    max-width: 1100px;
+    margin: auto;
+    border: 0;
+    background: transparent;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0 24px 20px;
+  }
+  .bottom button {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 13px;
+    display: flex;
+    gap: 8px;
+  }
+  header { padding: 22px 24px 8px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="brand">RideLog <span>⚡</span></div>
+    <div class="sub">EV Ride & Battery Logbook</div>
+  </div>
+  <div class="toolbar">
+    <button class="vehicle-chip" id="vehicleSwitch">Ola S1 X ▾</button>
+    <button class="iconbtn" id="themeToggle" aria-label="Toggle theme">☾</button>
+  </div>
+</header>
+<main>
+
+<section id="home" class="tab">
+<div class="card">
+  <div class="battery-single">
+    <div class="ring dual" id="batteryRing" style="--charged:0%;--total:0%">
+      <span id="batteryText">—%</span>
+    </div>
+    <div style="flex:1;min-width:130px">
+      <div style="font-weight:800;font-size:16px" id="lastChargeDate">L.C. —</div>
+      <div class="battery-legend">
+        <span class="legend-item"><i class="legend-dot" style="background:var(--accent)"></i>Charged</span>
+        <span class="legend-item"><i class="legend-dot" style="background:var(--warning)"></i>Used</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="grid">
+  <div class="metric"><small>Current Odo</small><strong id="homeOdo">— km</strong></div>
+  <div class="metric"><small>Last ride</small><strong id="homeDistance">— km</strong></div>
+  <div class="metric"><small>Efficiency</small><strong id="homeEfficiency">— km/kWh</strong></div>
+  <div class="metric"><small>Cost / km</small><strong id="homeCostKm">—</strong></div>
+</div>
+<div class="layout">
+  <div class="card">
+    <div class="toolbar"><h3>Last recorded ride</h3><span class="pill" id="rideCount">0 entries</span></div>
+    <div class="grid">
+      <div><div class="muted">Energy used</div><b id="homeUnits" class="big" style="font-size:20px">— kWh</b></div>
+      <div><div class="muted">Electricity cost</div><b id="homeCost" class="big" style="font-size:20px">—</b></div>
+    </div>
+    <button class="primary" style="width:100%;margin-top:14px" onclick="showTab('rides')">＋ Log ride / charge</button>
+  </div>
+  <div class="card">
+    <h3>Next service reminder</h3>
+    <div id="nextService" class="muted">No reminders set. Add one in Service.</div>
+    <button class="btn" style="margin-top:12px;width:100%" onclick="showTab('service')">Manage reminders</button>
+  </div>
+</div>
+</section>
+
+<section id="rides" class="tab hidden">
+<div class="layout">
+  <div class="card">
+    <h2 id="rideFormTitle">Log ride / charge</h2>
+    <form id="rideForm">
+      <input type="hidden" id="rideId">
+      <label>Last charged date</label>
+      <div class="date-select" aria-label="Choose ride date">
+        <select id="chargeDay" aria-label="Day"></select>
+        <select id="chargeMonth" aria-label="Month"></select>
+        <select id="chargeYear" aria-label="Year"></select>
+      </div>
+      <input type="hidden" id="chargeDate">
+      
+      <div class="row">
+        <div>
+          <label>Battery from (%)</label>
+          <div class="slider-block">
+            <div class="slider-value" id="batteryFromValue">0%</div>
+            <input id="batteryFrom" type="range" min="0" max="100" step="1" value="0" required>
+            <div class="quick-btns">
+              <button type="button" class="quick-btn" onclick="setFromVal(100)">100%</button>
+              <button type="button" class="quick-btn" onclick="setFromVal(80)">80%</button>
+              <button type="button" class="quick-btn" onclick="setFromVal(50)">50%</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Battery to (%)</label>
+          <div class="slider-block">
+            <div class="slider-value" id="batteryToValue">0%</div>
+            <input id="batteryTo" type="range" min="0" max="100" step="1" value="0" required>
+            <div class="quick-btns">
+              <button type="button" class="quick-btn" onclick="setToVal(20)">20%</button>
+              <button type="button" class="quick-btn" onclick="setToVal(15)">15%</button>
+              <button type="button" class="quick-btn" onclick="setToVal(0)">0%</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <label>Current Odo (km)</label>
+      <div class="slider-block">
+        <div class="slider-value" id="currentOdoValue">0 km</div>
+        <input id="currentOdo" type="range" min="0" max="180" step="0.1" value="0" required>
+        <small class="muted" id="odoRangeHint">Slide up to 180 km from the previous reading</small>
+      </div>
+
+      <label>Estimated electricity used (kWh)</label>
+      <input id="energy" type="number" min="0" step=".01" readonly style="background:var(--soft)">
+      <small class="muted">Calculated using battery percentage used, pack capacity, and charging loss factor.</small>
+
+      <div class="row">
+        <div>
+          <label>Fuel Price (₹/L) <button type="button" class="iconbtn" onclick="editRates()">✎</button></label>
+          <input id="petrolRate" type="number" min="0" step=".01">
+        </div>
+        <div>
+          <label>Power Rate (₹/kWh) <button type="button" class="iconbtn" onclick="editRates()">✎</button></label>
+          <input id="electricRate" type="number" min="0" step=".01">
+        </div>
+      </div>
+
+      <label>Notes (optional)</label>
+      <input id="rideNotes" maxlength="160" placeholder="e.g., City trip, ECO mode, Fast charger">
+
+      <button class="primary" type="submit" id="rideSave" style="width:100%;margin-top:14px">Save Ride</button>
+      <button class="btn hidden" type="button" id="rideCancel" style="width:100%;margin-top:8px">Cancel Edit</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Calculated for this ride</h3>
+    <div class="grid">
+      <div class="metric"><small>Distance</small><strong id="calcDistance">— km</strong></div>
+      <div class="metric"><small>Efficiency</small><strong id="calcEfficiency">—</strong></div>
+      <div class="metric"><small>Charging Cost</small><strong id="calcCost">—</strong></div>
+      <div class="metric"><small>Cost / km</small><strong id="calcCostKm">—</strong></div>
+    </div>
+    <p class="muted" style="margin-top:12px">Distance is computed automatically from your previous saved odometer entry to this entry.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Ride History</h2>
+  <input id="rideSearch" placeholder="Search date or notes...">
+  <div id="rideHistory" class="muted" style="margin-top:10px">No rides recorded.</div>
+</div>
+</section>
+
+<section id="service" class="tab hidden">
+<div class="layout">
+  <div class="card">
+    <h2>Add Service Reminder</h2>
+    <form id="serviceForm">
+      <label>Reminder Name</label>
+      <input id="serviceName" placeholder="e.g. Brake pad check, Chain lube" required>
+      <div class="service-slider">
+        <div class="toolbar"><span>Remind at odometer</span><b id="serviceAtOdoValue">0 km</b></div>
+        <input id="serviceAtOdoSlider" type="range" min="0" max="50000" step="10" value="0">
+      </div>
+      <div class="service-slider">
+        <div class="toolbar"><span>Repeat interval</span><b id="serviceEveryKmValue">0 km</b></div>
+        <input id="serviceEveryKmSlider" type="range" min="0" max="10000" step="10" value="0">
+      </div>
+      <div class="service-readings">
+        <div><label>At Odo</label><input id="serviceAtOdo" type="number" min="0" placeholder="km"></div>
+        <div><label>Every km</label><input id="serviceEveryKm" type="number" min="0" placeholder="km"></div>
+        <div><label>Every days</label><input id="serviceEveryDays" type="number" min="0" placeholder="days"></div>
+      </div>
+      <label>Next Due Date (optional)</label>
+      <div class="date-pick"><span aria-hidden="true">📅</span><input id="serviceDueDate" type="date"></div>
+      <button class="primary" style="width:100%;margin-top:14px">Add Reminder</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Reminder Logic</h3>
+    <p class="muted">Reminders trigger when your current saved odometer meets or exceeds the target odometer, or when the specified due date arrives.</p>
+  </div>
+</div>
+<div class="card">
+  <h2>Your Reminders</h2>
+  <div id="serviceHistory" class="muted">No reminders set.</div>
+</div>
+</section>
+
+<section id="stats" class="tab hidden">
+<div class="card">
+  <div class="toolbar" style="flex-wrap:wrap">
+    <h2>Advanced Analytics</h2>
+    <select id="statsScope" aria-label="Statistics vehicle" style="max-width:220px"></select>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <div><label for="statsMonth">Month</label><input type="month" id="statsMonth"></div>
+    <div><label for="statsYear">Year</label><select id="statsYear"></select></div>
+  </div>
+
+  <h3 style="margin-top:18px">Monthly Summary</h3>
+  <div class="grid">
+    <div class="metric"><small>Distance</small><strong id="statMonth">0 km</strong></div>
+    <div class="metric"><small>Electricity</small><strong id="statMonthEnergy">0 kWh</strong></div>
+    <div class="metric"><small>EV Cost</small><strong id="statMonthCost">₹0</strong></div>
+    <div class="metric"><small>Efficiency</small><strong id="statMonthEfficiency">—</strong></div>
+    <div class="metric"><small>Charges</small><strong id="statMonthRides">0</strong></div>
+    <div class="metric"><small>Est. Savings</small><strong id="statSavings">₹0</strong></div>
+  </div>
+
+  <h3 style="margin-top:22px">Yearly Summary</h3>
+  <div class="grid">
+    <div class="metric"><small>Year Distance</small><strong id="statYearDistance">0 km</strong></div>
+    <div class="metric"><small>Electricity</small><strong id="statYearEnergy">0 kWh</strong></div>
+    <div class="metric"><small>EV Cost</small><strong id="statYearCost">₹0</strong></div>
+    <div class="metric"><small>Avg Efficiency</small><strong id="statYearEfficiency">—</strong></div>
+    <div class="metric"><small>Est. Petrol Cost</small><strong id="statYearPetrol">₹0</strong></div>
+    <div class="metric"><small>Est. Savings</small><strong id="statYearSavings">₹0</strong></div>
+  </div>
+
+  <h3 style="margin-top:22px">Monthly Distance Comparison</h3>
+  <div id="monthBars"></div>
+
+  <h3 style="margin-top:22px">Efficiency Highlights</h3>
+  <div id="efficiencyHighlights" class="muted">No efficiency data.</div>
+
+  <div id="vehicleBreakdown" style="margin-top:20px"></div>
+
+  <div class="row" style="margin-top:16px">
+    <button class="primary" id="makePdf" type="button">Monthly PDF</button>
+    <button class="btn" id="makeYearPdf" type="button">Yearly PDF</button>
+  </div>
+</div>
+</section>
+
+<section id="profile" class="tab hidden">
+<div class="card">
+  <h2>Vehicle Profiles</h2>
+  <div id="vehicleList"></div>
+  <h3 style="margin-top:18px">Add Vehicle</h3>
+  <form id="vehicleForm">
+    <label>Vehicle Name</label><input id="newVehicleName" placeholder="e.g. Tata Punch EV, Ola S1 Pro" required>
+    <label>Registration Number</label><input id="newVehicleReg" placeholder="e.g. TN 16 X 1234">
+    <button class="primary" style="margin-top:12px">Add Vehicle</button>
+  </form>
+</div>
+<div class="card">
+  <h2>Profile & Parameters</h2>
+  <label>Selected Vehicle</label><input id="profileName">
+  <label>Registration Number</label><input id="profileReg">
+  <label>Assumed Petrol Mileage (km/L)</label><input id="petrolMileage" type="number" min="0" step=".1">
+  <label>Battery Capacity (kWh)</label><input id="batteryCapacity" type="number" min="0.1" step=".1">
+  <label>Max Range per Charge (km)</label><input id="maxRange" type="number" min="1" step="1">
+  <label>Charging Loss Factor / Efficiency (%)</label><input id="chargeEfficiency" type="number" min="1" max="100" step="1">
+  <button class="primary" id="saveProfile" style="margin-top:14px">Save Profile</button>
+  <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+  <button class="btn" id="exportData">Export JSON Backup</button>
+  <label class="btn" for="importFile" style="display:inline-block;margin-left:6px">Import Backup</label>
+  <input class="hidden" id="importFile" type="file" accept="application/json">
+</div>
+</section>
+</main>
+
+<div class="bottom" id="bottomNav">
+  <button class="active" data-tab="home"><b>⌂</b>Home</button>
+  <button data-tab="rides"><b>↗</b>Rides</button>
+  <button data-tab="service"><b>⚒</b>Service</button>
+  <button data-tab="stats"><b>▥</b>Stats</button>
+  <button data-tab="profile"><b>♙</b>Profile</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
