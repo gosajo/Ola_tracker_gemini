@@ -1,10 +1,26 @@
 {
+  "id": "./",
   "name": "RideLog – EV Tracker",
   "short_name": "RideLog",
+  "lang": "en-IN",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
   "background_color": "#121614",
   "theme_color": "#121614",
+  "categories": [
+    "auto",
+    "utilities",
+    "finance"
+  ],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e5357",
+  "prefer_related_applications": false,
   "description": "RideLog V8.0: EV ride, battery health, trip history, expense tracker & savings calculator",
   "icons": [
     {
@@ -12,6 +28,34 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-mobile.png",
+      "sizes": "540x960",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "RideLog mobile dashboard and logs"
+    },
+    {
+      "src": "screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "RideLog analytics and savings view"
     }
   ]
 }
