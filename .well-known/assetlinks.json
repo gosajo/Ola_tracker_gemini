@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "io.github.gosajo.twa",
-        "sha256_cert_fingerprints": ["CC:25:E3:96:BA:7F:F2:E4:77:2C:CE:EA:3D:AB:CD:8D:D3:6B:AF:82:F1:1B:38:D8:E7:A5:33:B6:B4:00:B3:11"]
+        "sha256_cert_fingerprints": ["46:9D:6B:C8:B1:B3:6F:51:B7:CC:9C:96:DC:DD:99:B9:68:B1:EA:7B:26:63:FF:28:3E:99:D5:C3:DA:21:16:E8"]
       }
     }]
