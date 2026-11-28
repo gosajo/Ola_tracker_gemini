@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.gosajo.twa",
+        "sha256_cert_fingerprints": ["20:F3:9E:06:EA:DB:53:68:40:B6:98:A6:35:FF:D4:96:26:62:92:08:57:3A:55:65:F8:A2:7A:2E:56:E5:10:76"]
+      }
+    }]
